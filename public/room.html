@@ -1,0 +1,63 @@
+<!doctype html>
+<html lang="en" data-page="room">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>P2P Watch Party - Room</title>
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+  <main class="shell">
+    <header class="space-between">
+      <div>
+        <h1>P2P Watch Party</h1>
+        <p class="muted" id="roomMeta">Connecting...</p>
+      </div>
+      <div class="status">
+        <span id="connectionState" class="pill">Disconnected</span>
+        <span id="peerState" class="pill muted">No peer</span>
+      </div>
+    </header>
+
+    <section class="card">
+      <div class="controls">
+        <div class="row">
+          <input type="file" id="filePicker" accept="video/*" />
+          <button id="startStreamBtn" class="primary">Start Streaming</button>
+          <button id="shareScreenBtn" class="secondary">Share Screen</button>
+          <button id="syncBtn" class="secondary">Force Sync</button>
+          <button id="renegotiateBtn" class="secondary">Reconnect</button>
+        </div>
+        <div class="row">
+          <button id="playBtn">Play</button>
+          <button id="pauseBtn">Pause</button>
+          <button id="recordBtn" class="secondary">Start Recording</button>
+        </div>
+        <div class="row">
+          <span class="muted small">Latency: <span id="latency">--</span> ms</span>
+          <span class="muted small">Role: <span id="roleLabel"></span></span>
+          <span class="muted small">Room: <span id="roomLabel"></span></span>
+        </div>
+      </div>
+      <video id="video" controls playsinline class="video"></video>
+    </section>
+
+    <section class="card grid">
+      <div>
+        <h3>Connection Log</h3>
+        <div id="log" class="log"></div>
+      </div>
+      <div>
+        <h3>Chat</h3>
+        <div id="chat" class="log"></div>
+        <div class="form-row">
+          <input id="chatInput" placeholder="Message" />
+          <button id="chatSendBtn" class="secondary">Send</button>
+        </div>
+      </div>
+    </section>
+  </main>
+  <script src="/socket.io/socket.io.js"></script>
+  <script src="client.js"></script>
+</body>
+</html>

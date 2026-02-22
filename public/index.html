@@ -1,0 +1,35 @@
+<!doctype html>
+<html lang="en" data-page="index">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>P2P Watch Party</title>
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+  <main class="shell">
+    <header>
+      <h1>P2P Watch Party</h1>
+      <p class="muted">Host a room and share a local video over WebRTC.</p>
+    </header>
+    <section class="card">
+      <h2>Create Room</h2>
+      <p class="muted">Generates a UUID-backed room and prepares you as host.</p>
+      <button id="createRoomBtn" class="primary">Create Room</button>
+      <div id="createRoomResult" class="result"></div>
+    </section>
+    <section class="card">
+      <h2>Join Room</h2>
+      <p class="muted">Paste a room ID from your host.</p>
+      <div class="form-row">
+        <input id="joinRoomId" placeholder="Room ID (UUID)" aria-label="Room ID" />
+        <button id="joinRoomBtn" class="secondary">Join as Peer</button>
+      </div>
+      <div id="joinRoomError" class="error"></div>
+    </section>
+    <footer class="muted small">Only signaling occurs server-side; media flows peer-to-peer.</footer>
+  </main>
+  <script src="/socket.io/socket.io.js"></script>
+  <script src="client.js"></script>
+</body>
+</html>
