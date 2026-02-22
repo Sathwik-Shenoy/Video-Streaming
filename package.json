@@ -1,14 +1,17 @@
 {
-  "name": "p2p-watch-party",
-  "version": "1.0.0",
-  "description": "Peer-to-peer watch party with WebRTC and Socket.io signaling",
+  "name": "watch-party",
+  "version": "2.0.0",
+  "description": "Cross-network Watch Party — WebRTC mesh + Socket.io signaling",
   "main": "server/server.js",
   "scripts": {
     "start": "node server/server.js",
-    "dev": "NODE_ENV=development nodemon server/server.js"
+    "dev": "NODE_ENV=development nodemon server/server.js",
+    "prod": "NODE_ENV=production node server/server.js",
+    "cert": "./generate-cert.sh"
   },
   "dependencies": {
     "cors": "^2.8.5",
+    "dotenv": "^17.3.1",
     "express": "^4.18.2",
     "helmet": "^7.0.0",
     "socket.io": "^4.7.5",

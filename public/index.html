@@ -3,33 +3,39 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>P2P Watch Party</title>
+  <title>Watch Party</title>
   <link rel="stylesheet" href="styles.css" />
 </head>
 <body>
-  <main class="shell">
-    <header>
-      <h1>P2P Watch Party</h1>
-      <p class="muted">Host a room and share a local video over WebRTC.</p>
+  <main class="shell index-shell">
+    <header class="index-header">
+      <div class="logo">
+        <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="5 3 19 12 5 21 5 3"/></svg>
+        <h1>Watch Party</h1>
+      </div>
+      <p class="muted">Host a room, share a video, watch together. Peer-to-peer.</p>
     </header>
+
     <section class="card">
       <h2>Create Room</h2>
-      <p class="muted">Generates a UUID-backed room and prepares you as host.</p>
-      <button id="createRoomBtn" class="primary">Create Room</button>
+      <p class="muted">Start a new watch party as host. Up to 6 people can join.</p>
+      <button id="createRoomBtn" class="btn btn-primary">Create Room</button>
       <div id="createRoomResult" class="result"></div>
     </section>
+
     <section class="card">
       <h2>Join Room</h2>
-      <p class="muted">Paste a room ID from your host.</p>
+      <p class="muted">Paste the room ID or link shared by your host.</p>
       <div class="form-row">
         <input id="joinRoomId" placeholder="Room ID (UUID)" aria-label="Room ID" />
-        <button id="joinRoomBtn" class="secondary">Join as Peer</button>
+        <button id="joinRoomBtn" class="btn btn-secondary">Join</button>
       </div>
       <div id="joinRoomError" class="error"></div>
     </section>
-    <footer class="muted small">Only signaling occurs server-side; media flows peer-to-peer.</footer>
+
+    <footer class="muted small">Media flows peer-to-peer. Only signaling uses the server.</footer>
   </main>
   <script src="/socket.io/socket.io.js"></script>
-  <script src="client.js"></script>
+  <script type="module" src="js/main.js"></script>
 </body>
 </html>
