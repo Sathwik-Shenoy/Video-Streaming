@@ -1,26 +1,29 @@
 # P2P Watch Party
 
-Production-grade **WebRTC peer-to-peer watch party** where a **host streams a local video file (or optionally a screen share)** directly to **one peer** over the internet. The server performs **signaling only** (no media relay / no media processing).
+Production-oriented WebRTC watch party app where a host shares local media to participants. Media is peer-to-peer (mesh), while the Node.js server handles signaling, room state, rate limiting, and ICE config.
 
-## Architecture
+## What this project does
 
-- **Backend**: Node.js + Express + Socket.io
-  - Serves static frontend from `public/`
-  - Provides `GET /api/room/new` to mint UUIDv4 room IDs
-  - Maintains in-memory **1:1 room state**: exactly **one host** and **one peer**
-  - Relays signaling messages (`offer/answer/ICE`) between host and peer
-  - **No media traffic** goes through the server
+- Creates UUID-based rooms for watch sessions
+- Supports one host and multiple peers per room (mesh topology)
+- Streams host media via WebRTC to connected peers
+- Syncs playback using host-authoritative control events
+- Supports chat, latency ping, reconnect/renegotiation, and optional recording
+- Exposes TURN/STUN ICE configuration from server-side environment variables
 
-- **Frontend**: Vanilla JS + WebRTC + HTML5 `<video>`
-  - Host selects a local file and streams it using `HTMLVideoElement.captureStream()`
-  - WebRTC `RTCPeerConnection` sends tracks to the peer
-  - A WebRTC **data channel** synchronizes controls, drift correction, chat, and latency measurement
+## Tech stack
 
-## Folder structure
+- Backend: Node.js, Express, Socket.io
+- Frontend: Vanilla JavaScript, HTML5 video, WebRTC
+- Security/runtime: Helmet, CORS, dotenv, custom in-memory rate limiting
 
-```
+## Project structure
+
+```txt
 server/
   server.js
+  roomManager.js
+  rateLimiter.js
 public/
   index.html
   room.html
@@ -30,218 +33,101 @@ package.json
 README.md
 ```
 
-## Running locally
-
-Install dependencies:
+## Quick start
 
 ```bash
 npm install
-```
-
-Start the server:
-
-```bash
 npm start
 ```
 
-Open:
-- `http://localhost:3001/` → create a room (host link + peer link)
+App runs on:
+- `http://localhost:3000` (default)
 
-## WebRTC flow (high level)
+Useful scripts:
+- `npm run start` - production-style run
+- `npm run dev` - nodemon development mode
+- `npm run prod` - explicit production env run
 
-### 1) Room system (Socket.io rooms)
+## Environment variables
 
-- Host creates a room ID via `GET /api/room/new` and opens:
-  - `room.html?room=<uuid>&role=host`
-- Peer joins via:
-  - `room.html?room=<uuid>`
+Optional (with defaults):
 
-Server enforces:
-- **One host per room**
-- **One peer per room**
-- Room IDs must be **UUIDv4**
+- `PORT=3000`
+- `NODE_ENV=development`
+- `USE_HTTPS=false`
+- `SSL_CERT_PATH=certs/cert.pem`
+- `SSL_KEY_PATH=certs/key.pem`
+- `ALLOWED_ORIGIN=*`
+- `RATE_LIMIT_MAX=120`
 
-### 2) SDP offer/answer exchange (signaling)
+TURN config (recommended for restrictive NATs):
 
-**Host**
-- Creates `RTCPeerConnection`
-- Creates a **data channel** (`control`)
-- After selecting a file:
-  - loads it into a `<video>`
-  - calls `video.captureStream()` to get a `MediaStream`
-  - adds tracks to the peer connection
-- Creates an SDP **offer** and sends it via Socket.io:
-  - `signal:offer`
+- `TURN_URL` (supports comma-separated URLs)
+- `TURN_USERNAME`
+- `TURN_PASSWORD`
 
-**Peer**
-- Receives `signal:offer`
-- Applies it as `setRemoteDescription()`
-- Creates SDP **answer**
-- Sends it back via Socket.io:
-  - `signal:answer`
+## HTTP endpoints
 
-Once both sides have exchanged descriptions, the peer connection can establish.
+- `GET /health` - server health, uptime, room count
+- `GET /api/room/new` - mint a new UUID room ID
+- `GET /api/ice-config` - STUN/TURN configuration used by clients
 
-### 3) ICE candidates exchange (NAT traversal)
+## Socket event reference
 
-WebRTC gathers potential network routes called **ICE candidates**.
+Room and presence:
+- `room:join` - join as `host` or `peer`
+- `room:leave` - explicit leave
+- `room:user-joined` - notify room members about join
+- `room:info` - broadcast current room public state
 
-- Each side emits candidates in `pc.onicecandidate`
-- Candidates are relayed via Socket.io:
-  - `signal:ice`
-- The other side calls `pc.addIceCandidate()`
+Signaling:
+- `signal:offer`
+- `signal:answer`
+- `signal:ice`
+- `signal:renegotiate`
+- `signal:restart-ice`
 
-This project uses:
-- **STUN**: Google public STUN server (`stun:stun.l.google.com:19302`)
-- **TURN placeholder**: present in code comments for production TURN deployment
+Sync and interaction:
+- `sync:state` - host broadcasts authoritative playback state
+- `sync:request` - peer requests host action (`play/pause/seek`)
+- `chat:message` - relayed room chat message
+- `ping:req` / `ping:res` - RTT measurement
 
-### NAT traversal notes
+## How it works
 
-- **STUN** helps discover the public-facing address of a peer behind NAT.
-- Some NAT/firewall configurations require **TURN** (a relay) to succeed.
-- The server in this repo is **not a TURN server** and does not relay media.
+1. User creates room via `GET /api/room/new`.
+2. Host joins room and starts media stream from local video element.
+3. Peers join the same room.
+4. Peers establish WebRTC connections using targeted offer/answer + ICE via Socket.io.
+5. Once connected, media flows directly peer-to-peer.
+6. Host sends authoritative sync state; peers request actions through host to avoid desync conflicts.
 
-## Data channel usage
+## Networking notes
 
-A reliable ordered WebRTC data channel is used for:
+- STUN is enabled by default (Google STUN servers).
+- TURN is environment-driven; strongly recommended for production reliability across NAT/firewalls.
+- Server does not relay media.
 
-- **Playback control requests** (peer → host): `req`
-- **Authoritative state broadcasts** (host → peer): `state`
-- **Chat** messages: `chat`
-- **Latency measurement**: `ping` / `pong` (RTT)
+## Security and reliability notes
 
-Because media and control are both peer-to-peer, playback remains responsive and low-latency once connected.
+- Room IDs are validated as UUIDs.
+- In-memory rate limiting is applied to HTTP and socket handshakes.
+- Helmet and CORS are enabled.
+- Room state is in memory (no persistence across restarts).
 
-## Sync algorithm (authoritative timestamp model)
+## Known limitations
 
-### Roles
+- Mesh topology scales poorly for large rooms (peer count growth increases bandwidth/CPU load).
+- Room state resets on server restart.
+- For production, add durable storage, full auth, and a managed TURN setup.
 
-- **Host is authoritative** for playback state.
-- **Peer can request controls** (play/pause/seek), but the host applies the request and re-broadcasts the authoritative state.
+## Local test flow (single machine)
 
-This prevents control “dueling” and makes drift correction deterministic.
+1. Start server with `npm start`.
+2. Open `http://localhost:3000` in Browser A, create room, join as host.
+3. Open the join link in Browser B (or incognito) as peer.
+4. Start playback on host and verify sync/chat/latency behavior.
 
-### Messages
+## License
 
-- `req` (peer → host): `{ action: 'play'|'pause'|'seek'|'state', time? }`
-- `state` (host → peer): `{ seq, paused, time, sentAt, reason }`
-
-### Infinite-loop prevention
-
-Programmatic changes (applying remote state) can trigger local DOM events (`play`, `pause`, `seeked`).
-
-The client prevents loops by:
-- Setting a short **suppression window** (≈ 400ms) while applying remote changes
-- Ignoring media events during that window
-
-### Debouncing seeks
-
-Seeking can fire rapidly while dragging the scrubber.
-
-The peer:
-- Debounces seek requests (~250ms)
-to reduce spam and improve stability.
-
-### Drift correction (> 500ms)
-
-The host periodically broadcasts `state` every ~2s.
-
-The peer:
-- Predicts the *expected current time* based on:
-  - host `time`
-  - host `sentAt`
-  - local receipt time
-- If \(|drift| > 0.5s\), it snaps `currentTime` to the target
-
-## Error handling & retry behavior
-
-- If the peer opens the link before the host joins, the peer will **auto-retry** joining for ~60 seconds.
-- ICE failures show in the UI (`ICE: failed`).
-  - The peer can request an ICE restart (`signal:restart-ice`)
-  - The host can generate a fresh offer with `iceRestart: true`
-
-## Recording (optional)
-
-The room UI includes a recording button:
-- Host records the **local stream**
-- Peer records the **received remote stream**
-
-Recording uses `MediaRecorder` and produces a downloadable `.webm`.
-
-## Security notes
-
-- **Room ID validation**: UUIDv4 only
-- **Single host, single peer** enforced server-side
-- **Basic rate limiting**: in-memory per-IP window on HTTP requests and socket handshakes
-
-For production hardening you should add:
-- A real TURN server (and credentials)
-- HTTPS + secure WebSocket
-- CORS origin restriction (`ALLOWED_ORIGIN`)
-- Persistent state (if you need room persistence across deploys)
-
-# P2P Watch Party
-
-Peer-to-peer watch party using WebRTC for media and Socket.io for signaling. The server never touches media; it only handles signaling.
-
-## Features
-- Host captures a local video via `captureStream()` and shares it to a remote peer.
-- WebRTC with STUN (Google) and TURN placeholder configuration.
-- Data channel for playback sync, chat, latency pings, and drift correction.
-- Room system with UUID IDs, single host enforcement, and Socket.io rooms.
-- Basic rate limiting and security validation on the signaling server.
-- Optional recording of the received stream to WebM.
-
-## Quick start
-```bash
-npm install
-npm run start # or npm run dev
-```
-Open http://localhost:3000 and create or join a room.
-
-## Architecture
-- **Backend**: Node.js + Express + Socket.io (signaling only). Static files served from `public/`. No media processing.
-- **Frontend**: Vanilla JS + HTML5 video + WebRTC (`RTCPeerConnection`). Data channel drives sync and chat.
-- **Rooms**: UUID-based IDs. One host per room; peers join via link. Server keeps lightweight in-memory room state.
-
-## Signaling flow
-1. Host creates a room (UUID) and joins as host via Socket.io.
-2. Peer joins the same room ID.
-3. Host creates an `RTCPeerConnection`, adds captured video tracks, creates an SDP offer, and sends it through `signal:offer`.
-4. Peer sets the remote description, creates an SDP answer, and returns it with `signal:answer`.
-5. Both sides exchange ICE candidates through `signal:ice` until connectivity is established.
-6. Data channel (`control`) opens; playback and chat messages flow P2P.
-
-## WebRTC details
-- **SDP exchange**: Offer/answer exchanged over Socket.io. Host attaches media before creating an offer to avoid renegotiation.
-- **ICE candidates**: Trickled via `signal:ice` and added with `addIceCandidate`. Google STUN is configured; TURN placeholder included for production.
-- **NAT traversal**: STUN discovers public-facing candidates. For restrictive NATs, configure a TURN server in `public/client.js` `iceServers`.
-- **Data channel usage**: Single channel (`control`) carries JSON messages: `PLAY`, `PAUSE`, `SEEK`, `SYNC`, `SYNC_REQUEST`, `CHAT`, `PING/PONG` for latency. Messages are small and ordered (default reliable).
-
-## Sync algorithm
-- Authoritative timestamp broadcast on play/pause/seek. Hosts respond to `SYNC_REQUEST` with `SYNC` carrying `currentTime` and `paused` state.
-- Drift correction: receivers compare `currentTime` against incoming timestamps; if |delta| > 0.5s, they fast seek to the authoritative time.
-- Debounce: `seeked` events are debounced (~120ms) before sending to prevent event storms.
-- Loop prevention: Incoming sync actions run under a suppression flag to avoid re-emitting events.
-
-## Error handling
-- Invalid room IDs rejected server-side; only one host allowed per room.
-- Rate limiting on HTTP and socket handshakes (simple in-memory sliding window).
-- ICE failure triggers renegotiation request (`signal:renegotiate`); manual reconnect button is provided.
-- UI shows connection state and peer presence.
-
-## Recording
-- `MediaRecorder` can record the remote stream (or local if remote not available). Output is a downloadable WebM file.
-
-## Folder structure
-- server/server.js
-- public/index.html
-- public/room.html
-- public/client.js
-- public/styles.css
-- package.json
-
-## Deployment notes
-- Set `PORT` via environment variable if needed.
-- Add a TURN server entry in `iceServers` for production NAT traversal.
-- Behind proxies, ensure `trust proxy` is set on Express if you need accurate IPs for rate limiting.
+MIT
